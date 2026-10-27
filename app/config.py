@@ -7,9 +7,9 @@ class Settings(BaseSettings):
     app_name: str = "Multilingual Customer-Support Translation System"
     app_version: str = "1.0.0"
     model_name: str = "facebook/nllb-200-distilled-600M"
-    max_input_tokens: int = 512
-    max_new_tokens: int = 512
-    num_beams: int = 5
+    max_input_tokens: int = 128
+    max_new_tokens: int = 128
+    num_beams: int = 1
     no_repeat_ngram_size: int = 3
     length_penalty: float = 1.0
     early_stopping: bool = True

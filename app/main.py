@@ -14,6 +14,10 @@ from app.schemas import (
 )
 from app.translation_service import TranslationService
 
+from pathlib import Path
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
 settings = get_settings()
 logging.basicConfig(
     level=settings.log_level.upper(),
@@ -42,6 +46,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+app.mount(
+    "/static",
+    StaticFiles(directory=PROJECT_ROOT / "static"),
+    name="static",
+)
 
 def to_response(result) -> TranslationResponse:
     return TranslationResponse(
@@ -62,13 +72,7 @@ def to_response(result) -> TranslationResponse:
 
 @app.get("/")
 def root():
-    return {
-        "application": settings.app_name,
-        "version": settings.app_version,
-        "docs": "/docs",
-        "health": "/health",
-        "supported_languages": LANGUAGES,
-    }
+    return FileResponse(PROJECT_ROOT / "templates" / "index.html")
 
 
 @app.get("/health")
