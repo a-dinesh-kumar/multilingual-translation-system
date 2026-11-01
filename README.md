@@ -1,11 +1,12 @@
 # Multilingual Customer-Support Translation System
 
-A multilingual translation system built with **FastAPI, Hugging Face Transformers, PyTorch, and the NLLB-200 Distilled 600M model**.
+A multilingual translation system built with **FastAPI, Google Cloud Translation API, and Python**.
 
-The application translates customer-support messages between English, French, Spanish, Hindi, and Tamil through single-message and batch REST API endpoints. It also includes language detection, protected-term restoration, token counting, and translation latency reporting.
+The application translates customer-support messages between English, French, Spanish, Hindi, and Tamil through single-message and batch REST API endpoints. It also includes automatic language detection, protected-term restoration, input character counting, and translation latency reporting.
 
 ## Live Demo
 
+https://multilingual-translation-system-hu6a.onrender.com/
 
 ---
 
@@ -18,7 +19,7 @@ The application translates customer-support messages between English, French, Sp
   - [Features](#features)
   - [Technology Stack](#technology-stack)
   - [Supported Languages](#supported-languages)
-  - [Model Configuration](#model-configuration)
+  - [Translation Configuration](#translation-configuration)
   - [System Architecture](#system-architecture)
   - [Project Structure](#project-structure)
     - [Module Responsibilities](#module-responsibilities)
@@ -38,12 +39,12 @@ The application translates customer-support messages between English, French, Sp
     - [Running Unit Tests](#running-unit-tests)
   - [Performance and Limitations](#performance-and-limitations)
     - [Translation Quality](#translation-quality)
-    - [CPU Performance](#cpu-performance)
+    - [API Performance](#api-performance)
     - [Language Detection](#language-detection)
     - [Resource Requirements](#resource-requirements)
     - [Evaluation](#evaluation)
   - [Deployment](#deployment)
-  - [Model and Licensing](#model-and-licensing)
+  - [API Usage and Licensing](#api-usage-and-licensing)
   - [Future Improvements](#future-improvements)
   - [Author](#author)
     - [Areas of Interest](#areas-of-interest)
@@ -54,20 +55,22 @@ The application translates customer-support messages between English, French, Sp
 
 Customer-support teams often receive messages in different languages. This project provides a translation API to help process messages across language barriers.
 
-The application uses a pretrained multilingual encoder-decoder Transformer model to translate text. Its modular backend separates configuration, model loading, language handling, request validation, term protection, and translation logic.
+The application uses Google Cloud Translation API to translate text between supported languages. Its modular backend separates configuration, API client initialization, language handling, request validation, term protection, and translation logic.
+
+The project initially used Meta's NLLB-200 Distilled 600M model for local translation inference. During deployment, the model's memory requirements exceeded the resources available on the selected Render hosting tier. After evaluating alternative approaches, the translation layer was migrated to Google Cloud Translation API to support a lighter application deployment without loading a large machine-learning model locally.
 
 ## Features
 
 - **Multilingual translation:** Supports configured language directions across five languages.
 - **Single translation:** Translates one message per API request.
 - **Batch translation:** Processes multiple messages in one request.
-- **Language detection:** Provides source-language detection functionality.
+- **Automatic language detection:** Detects the source language when it is not explicitly provided.
 - **Term protection:** Helps preserve selected technical terms, identifiers, URLs, and other protected text.
-- **Translation metadata:** Returns language details, input token counts, and processing latency.
+- **Translation metadata:** Returns language details, input character counts, and processing latency.
 - **REST API:** Exposes translation functionality through FastAPI.
 - **Interactive API documentation:** Supports endpoint testing through Swagger UI.
-- **Modular architecture:** Separates configuration, model loading, language detection, schemas, and translation logic.
-- **Automated tests:** Includes unit tests for language detection and term protection.
+- **Modular architecture:** Separates configuration, API client, language detection, schemas, and translation logic.
+- **Automated tests:** Includes tests for language detection, term protection, and translation service behaviour.
 
 ## Technology Stack
 
@@ -76,87 +79,91 @@ The application uses a pretrained multilingual encoder-decoder Transformer model
 | Python | Core programming language |
 | FastAPI | REST API framework |
 | Uvicorn | ASGI application server |
-| Hugging Face Transformers | Pretrained model integration |
-| PyTorch | Model inference |
-| NLLB-200 Distilled 600M | Multilingual translation model |
-| SentencePiece | Tokenization support |
-| SacreMoses | Text-processing dependency |
-| langdetect | Language detection |
+| Google Cloud Translation API (Basic v2) | Translation service |
+| Requests | HTTP communication with Google API |
+| langdetect | Automatic language detection |
+| Pydantic | Request validation and data schemas |
 | Pydantic Settings | Application configuration |
 | pytest | Automated testing |
+| HTML, CSS, JavaScript | Frontend interface |
 
 ## Supported Languages
 
-| Language | API Code | NLLB Language Code |
-|---|---|---|
-| English | `en` | `eng_Latn` |
-| French | `fr` | `fra_Latn` |
-| Spanish | `es` | `spa_Latn` |
-| Hindi | `hi` | `hin_Deva` |
-| Tamil | `ta` | `tam_Taml` |
+| Language | API Code |
+|---|---|
+| English | `en` |
+| French | `fr` |
+| Spanish | `es` |
+| Hindi | `hi` |
+| Tamil | `ta` |
 
-The configured translation directions are:
+The application supports translation between the configured languages, including:
 
 - English ↔ French
 - English ↔ Spanish
 - English ↔ Hindi
 - English ↔ Tamil
+- French ↔ Spanish, Hindi, and Tamil
+- Spanish ↔ Hindi and Tamil
+- Hindi ↔ Tamil
 
-Only the directions enabled in the application configuration are supported by the API.
+The source language can be selected manually or detected automatically.
 
-## Model Configuration
+## Translation Configuration
 
 | Setting | Current Value |
 |---|---|
-| Model | `facebook/nllb-200-distilled-600M` |
-| Architecture | Encoder-decoder Transformer |
-| Translation strategy | Generation with configurable beam search |
-| Number of beams | `1` |
-| Maximum input length | `128` tokens |
-| Maximum generated tokens | `128` |
-| No-repeat n-gram size | `3` |
-| Length penalty | `1.0` |
-| Configured batch processing size | `8` |
-| Precision | FP16 on CUDA when available; FP32 on CPU |
+| Translation provider | Google Cloud Translation |
+| API version | Basic v2 |
+| API endpoint | `https://translation.googleapis.com/language/translate/v2` |
+| Translation approach | Cloud-based API translation |
+| Request format | JSON |
+| Supported languages | English, French, Spanish, Hindi, Tamil |
+| Maximum input length | 10,000 characters per message |
+| Maximum batch messages | 32 |
+| Batch request handling | Grouped by detected source language |
+| Batch character limit | 25,000 characters per provider request |
 
-These settings are intended to limit inference workload on resource-constrained environments. Longer messages or translations may be limited by the configured token lengths.
+The application sends translation requests to Google Cloud Translation API instead of loading a translation model into local memory.
 
-The application uses a pretrained model for inference. It does not train the translation model from scratch.
+For batch translation, messages are grouped by their resolved source language. Large groups are divided into smaller requests while preserving the original message order in the response.
+
+The application does not train or host a translation model locally.
 
 ## System Architecture
 
 ```text
-Client / API Consumer
-        |
-        v
-     FastAPI
-        |
-        v
+Client / Browser
+       |
+       v
+    FastAPI
+       |
+       v
  Request Validation
-        |
-        v
+       |
+       v
 Language Handling / Detection
-        |
-        v
+       |
+       v
  Protect Selected Terms
-        |
-        v
-      Tokenizer
-        |
-        v
- NLLB Translation Model
-        |
-        v
-    Text Decoding
-        |
-        v
+       |
+       v
+ Translation Service
+       |
+       v
+Google Cloud Translation API
+       |
+       v
  Restore Protected Terms
-        |
-        v
+       |
+       v
+ Post-processing
+       |
+       v
  JSON Translation Response
 ```
 
-For batch requests, multiple messages are submitted together and processed through the batch translation path. The response contains the individual results.
+For batch requests, messages are grouped by source language and sent to Google Cloud Translation API in batches. Results are restored to their original input order before returning the response.
 
 ![Multilingual Customer-Support Translation System Architecture](docs/architecture.png)
 
@@ -187,7 +194,8 @@ multilingual-translation-system/
 │
 ├── tests/
 │   ├── test_language_detection.py
-│   └── test_term_protection.py
+│   ├── test_term_protection.py
+│   └── test_translation_service.py
 │
 ├── .env.example
 ├── .gitignore
@@ -201,23 +209,25 @@ multilingual-translation-system/
 
 | Module | Responsibility |
 |---|---|
-| `config.py` | Application settings, model configuration, and language mappings |
+| `config.py` | Application settings, API configuration, and language mappings |
 | `language_detection.py` | Source-language detection |
-| `main.py` | FastAPI application lifecycle and API endpoints |
-| `model_loader.py` | Tokenizer and translation model initialization |
+| `main.py` | FastAPI application lifecycle, health check, and API endpoints |
+| `model_loader.py` | Google Cloud Translation API client initialization and communication |
 | `schemas.py` | Request and response validation |
 | `term_protection.py` | Protection and restoration of selected terms |
 | `translation_service.py` | Single and batch translation logic |
-| `tests/` | Unit tests for selected components |
+| `tests/` | Unit and translation service tests |
 
 ## Prerequisites
 
 - Python 3.11 recommended for a consistent development environment.
 - Git.
-- Internet access to download the pretrained model on the first run.
-- Sufficient RAM and disk space for the model and its dependencies.
+- Internet access for communication with Google Cloud Translation API.
+- A Google Cloud project with Cloud Translation API enabled.
+- A configured Google Cloud Translation API key.
+- Billing enabled for the Google Cloud project, subject to Google's applicable pricing and free usage allowance.
 
-The translation model is relatively large, so CPU inference may take several seconds or longer depending on the hardware and input length.
+No local GPU or large machine-learning model download is required.
 
 ## Installation and Setup
 
@@ -275,7 +285,15 @@ Copy-Item .env.example .env
 cp .env.example .env
 ```
 
-Update the values only if required by the application configuration. Never commit real credentials or secrets.
+Configure the Google Cloud Translation API key in `.env`:
+
+```env
+GOOGLE_TRANSLATE_API_KEY=your_google_cloud_translation_api_key
+```
+
+The application reads the API key from the environment configuration.
+
+Never commit your real API key or other credentials to source control. The `.env` file should remain excluded through `.gitignore`.
 
 ## Running the Application
 
@@ -289,12 +307,12 @@ Once the server starts, access the following URLs:
 
 | Resource | URL |
 |---|---|
-| Application | http://127.0.0.1:8000 |
-| Swagger documentation | http://127.0.0.1:8000/docs |
-| ReDoc documentation | http://127.0.0.1:8000/redoc |
-| Health endpoint | http://127.0.0.1:8000/health |
+| Application | [http://127.0.0.1:8000](http://127.0.0.1:8000) |
+| Swagger documentation | [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) |
+| ReDoc documentation | [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc) |
+| Health endpoint | [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health) |
 
-The first startup downloads the model if it is not already available in the Hugging Face cache. This may take several minutes depending on your internet connection.
+The application initializes the Google Cloud Translation API client during startup. A valid API key is required for translation requests.
 
 Stop the server using `Ctrl+C`.
 
@@ -302,7 +320,7 @@ Stop the server using `Ctrl+C`.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/` | Basic application information |
+| `GET` | `/` | Serves the translation application |
 | `GET` | `/health` | Health/status check |
 | `POST` | `/api/translate` | Translate a single message |
 | `POST` | `/api/translate/batch` | Translate multiple messages |
@@ -317,15 +335,18 @@ Example request:
 {
   "text": "I need a device to test this application",
   "source_language": "en",
-  "target_language": "ta"
+  "target_language": "ta",
+  "protect_terms": true
 }
 ```
+
+The `source_language` field is optional. Omit it to enable automatic language detection.
 
 Example response:
 
 ```json
 {
-  "source_text": "i need a device to test this application",
+  "source_text": "I need a device to test this application",
   "translated_text": "இந்த பயன்பாட்டை சோதிக்க எனக்கு ஒரு சாதனம் தேவை",
   "source_language": "en",
   "source_language_name": "English",
@@ -335,35 +356,32 @@ Example response:
   "target_nllb_code": "tam_Taml",
   "detected_confidence": 1,
   "detection_note": "Source language provided by caller.",
-  "input_token_count": 10,
-  "latency_ms": 7575.24
+  "input_token_count": 0,
+  "input_character_count": 40,
+  "latency_ms": 815.09
 }
 ```
 
-The example illustrates the response format. Translation output, token counts, and latency can vary between requests.
+The response illustrates the current response structure. Translation output and latency can vary between requests.
+
+The legacy `source_nllb_code` and `target_nllb_code` fields are retained for response compatibility. Google Cloud Translation API uses standard language codes such as `en`, `fr`, `es`, `hi`, and `ta`.
 
 ### 2. Batch Translation
 
 **Endpoint:** `POST /api/translate/batch`
 
-The batch endpoint accepts multiple messages and returns an individual result for each message.
+The batch endpoint accepts up to 32 messages and returns an individual result for each message.
 
 Example request:
 
 ```json
 {
-  "items": [
-    {
-      "text": "What is my order status?",
-      "source_language": "en",
-      "target_language": "ta"
-    },
-    {
-      "text": "Please cancel my subscription and process the refund.",
-      "source_language": "en",
-      "target_language": "ta"
-    }
-  ]
+  "messages": [
+    "What is my order status?",
+    "Please cancel my subscription and process the refund."
+  ],
+  "target_language": "ta",
+  "protect_terms": true
 }
 ```
 
@@ -383,22 +401,25 @@ Example response structure:
       "source_nllb_code": "eng_Latn",
       "target_nllb_code": "tam_Taml",
       "detected_confidence": 1,
-      "detection_note": "Source language provided by caller",
-      "input_token_count": 8,
-      "latency_ms": 4503.92
+      "detection_note": "Source language provided by caller.",
+      "input_token_count": 0,
+      "input_character_count": 25,
+      "latency_ms": 450.00
     }
   ]
 }
 ```
 
-Use the actual request and response schemas in Swagger UI as the authoritative reference, especially for batch requests.
+The example response is illustrative. Actual results depend on the submitted messages and translation provider response.
+
+The batch endpoint supports automatic source-language detection for individual messages when `source_language` is omitted. Results are returned in the same order as the original messages.
 
 ## Testing
 
 ### Using Swagger UI
 
 1. Start the application.
-2. Open http://127.0.0.1:8000/docs.
+2. Open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
 3. Expand `POST /api/translate` or `POST /api/translate/batch`.
 4. Click **Try it out**.
 5. Enter a request matching the displayed schema.
@@ -433,21 +454,26 @@ Run individual test files:
 ```bash
 python -m pytest -q tests/test_language_detection.py
 python -m pytest -q tests/test_term_protection.py
+python -m pytest -q tests/test_translation_service.py
 ```
 
-These unit tests cover selected components. Additional integration tests should verify the running API and translation behavior across all configured language directions.
+The translation service test requires a valid Google Cloud Translation API key and internet connectivity.
+
+These tests cover selected components. Additional integration tests should verify the running API and translation behaviour across all configured language directions.
 
 ## Performance and Limitations
 
 ### Translation Quality
 
-The model can produce understandable translations, but some sentences may sound unnatural or lose nuance. Quality depends on the language pair, context, spelling, informal language, and technical terminology.
+Google Cloud Translation API provides multilingual translation capabilities, but some sentences may sound unnatural or lose nuance. Quality depends on the language pair, context, spelling, informal language, and technical terminology.
 
 A successful HTTP `200` response means the request was processed; it does not guarantee a perfect translation.
 
-### CPU Performance
+### API Performance
 
-The application supports CPU inference, but translation may be slower than on suitable GPU hardware. Latency depends on the hardware, message length, model loading, and batch size.
+Translation requests are processed by Google Cloud Translation API. Latency depends on network conditions, message length, batch size, provider processing time, and service availability.
+
+Batch processing groups messages by source language and divides large groups into smaller requests to manage request size.
 
 ### Language Detection
 
@@ -455,7 +481,9 @@ Automatic language detection may be unreliable for very short messages, names, i
 
 ### Resource Requirements
 
-The pretrained model requires substantial disk space and RAM. Small hosting instances may not have enough memory to load it reliably. Reducing token limits can reduce some inference workload, but does not eliminate the model's memory requirements.
+The application no longer loads a large translation model into local memory. This significantly reduces application memory requirements compared with the original NLLB-200 implementation.
+
+However, the application still requires internet connectivity and access to Google Cloud Translation API. Translation requests may fail if the provider is unavailable, the API key is invalid, billing or API configuration is incorrect, or usage limits are reached.
 
 ### Evaluation
 
@@ -463,7 +491,7 @@ Translation quality should be evaluated using a representative dataset, automate
 
 ## Deployment
 
-The repository includes `render.yaml` if that file is committed. Review the deployment configuration and available service resources before deploying.
+The repository includes `render.yaml` if that file is committed. Review the deployment configuration before deploying.
 
 A typical Uvicorn start command for a hosted service is:
 
@@ -473,39 +501,41 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
 Before deployment:
 
-- Verify that the service has enough memory for the model.
-- Confirm model downloads and cache behavior.
+- Configure the Google Cloud Translation API key in the hosting provider's environment variables.
+- Ensure the API is enabled in the Google Cloud project.
+- Confirm billing and usage limits are configured appropriately.
 - Configure the correct start command and health-check path.
 - Test single and batch translation endpoints after deployment.
 - Keep credentials out of source control.
-- Monitor startup time, latency, and memory usage.
-- Review the model licence and intended-use restrictions.
+- Monitor API usage, startup behaviour, and translation latency.
+- Review Google's applicable API terms and pricing.
 
-**Render Free plan note:** Free services have resource limitations and may spin down after inactivity. Model startup, memory consumption, and translation latency should be tested on the actual deployed service. Successful local inference does not guarantee reliable operation on the free tier.
+**Render deployment note:** The migration to Google Cloud Translation API removes the large local model-loading requirement that caused memory issues on the selected Render resource tier. The application still depends on external API availability and network connectivity. Free hosting services may also spin down after inactivity, so the first request after inactivity may take longer.
 
-## Model and Licensing
+## API Usage and Licensing
 
-This project uses the [NLLB-200 Distilled 600M model](https://huggingface.co/facebook/nllb-200-distilled-600M), developed by Meta AI.
+This project uses [Google Cloud Translation](https://cloud.google.com/translate) through the Basic v2 REST API.
 
-- **Model:** `facebook/nllb-200-distilled-600M`
-- **Model licence:** CC-BY-NC 4.0
-- **Model card:** https://huggingface.co/facebook/nllb-200-distilled-600M
-- **Licence terms:** https://creativecommons.org/licenses/by-nc/4.0/
+- **Provider:** Google Cloud
+- **Service:** Cloud Translation Basic
+- **API version:** v2
+- **Documentation:** [Google Cloud Translation Basic](https://cloud.google.com/translate/docs/basic/translating-text)
+- **Pricing:** [Google Cloud Translation pricing](https://cloud.google.com/translate/pricing)
 
-This is a personal, non-commercial portfolio and learning project. The model is used subject to its applicable licence terms and restrictions. The model card describes its intended use primarily for research.
+Use of the translation service is subject to Google's applicable terms, pricing, quotas, and usage policies.
 
-Attribution and a non-commercial project description do not, by themselves, guarantee compliance in every circumstance. Review the model card and licence terms before changing the project's purpose or using it commercially.
+The API key must be kept confidential and must not be exposed in frontend code or committed to the repository. It should be configured through environment variables in local and hosted environments.
 
-The application code is a separate work from the pretrained model. Its source-code licence should be selected and documented separately by the repository owner. Other dependencies may have their own licence terms.
+The application code is a separate work from the Google Cloud Translation service. Its source-code licence should be selected and documented separately by the repository owner. Other dependencies may have their own licence terms.
 
-This project is an independent implementation and is not affiliated with or endorsed by Meta AI.
+This project is an independent implementation and is not affiliated with or endorsed by Google.
 
 ## Future Improvements
 
 - Expand automated integration testing across all configured language directions.
 - Build a curated translation evaluation dataset.
 - Compare translation quality using BLEU, chrF, and human review.
-- Evaluate alternative models if improved fluency or different licensing permissions are required.
+- Evaluate alternative translation providers where appropriate.
 - Add production monitoring, request limits, and stronger error handling.
 - Document an end-to-end translation dry run.
 
@@ -515,8 +545,8 @@ This project is an independent implementation and is not affiliated with or endo
 
 *Software Quality Engineer / SDET*
 
-- **GitHub:** https://github.com/a-dinesh-kumar
-- **LinkedIn:** https://www.linkedin.com/in/dinesh-kumar-alagarsamy
+- **GitHub:** [https://github.com/a-dinesh-kumar](https://github.com/a-dinesh-kumar)
+- **LinkedIn:** [https://www.linkedin.com/in/dinesh-kumar-alagarsamy](https://www.linkedin.com/in/dinesh-kumar-alagarsamy)
 
 ### Areas of Interest
 
