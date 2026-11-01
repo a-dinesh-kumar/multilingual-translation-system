@@ -83,10 +83,6 @@
       showError('Your message must be 10,000 characters or fewer.');
       return;
     }
-    if (sourceLanguage.value && sourceLanguage.value === targetLanguage.value) {
-      showError('Choose different source and target languages, or use Auto-detect as the source.');
-      return;
-    }
 
     translateBtn.disabled = true;
     translateBtn.classList.add('loading');
@@ -99,8 +95,9 @@
     detectionNote.hidden = true;
     lastTranslation = '';
 
-    // An empty source-language value means Auto-detect. Omit source_language
-    // entirely so the backend's notebook-based detector resolves it per message.
+    // An empty source-language value means Auto-detect.
+    // Omit source_language so the backend language detector resolves it.
+    // The detected language is then passed to Google Cloud Translation.
     const payload = {
       target_language: targetLanguage.value,
       protect_terms: protectTerms.checked
@@ -125,15 +122,28 @@
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        let detail = data.detail;
-        if (Array.isArray(detail)) detail = detail.map(item => item.msg || JSON.stringify(item)).join('; ');
-        throw new Error(detail || `Request failed with status ${response.status}.`);
+        const apiError = data.error || {};
+
+        let message = apiError.message || 'Translation request failed. Please try again.';
+
+        // Include field-level validation information when available.
+        if (Array.isArray(apiError.details) && apiError.details.length > 0) {
+          const validationMessages = apiError.details
+            .map(item => item.message)
+            .filter(Boolean);
+
+          if (validationMessages.length > 0) {
+            message = `${message} ${validationMessages.join(' ')}`;
+          }
+        }
+
+        throw new Error(message);
       }
       if (mode === 'single') renderSingle(data);
       else renderBatch(data);
     } catch (error) {
       const message = error instanceof TypeError
-        ? 'Could not reach the API. Open this UI at http://127.0.0.1:8000/ (not by double-clicking index.html), and confirm the FastAPI server is running. The first translation can take several seconds while the model warms up.'
+        ? 'Could not reach the application server. Please check that the application is running and try again.'
         : (error.message || 'Translation request failed. Check the FastAPI terminal for details.');
       showError(message);
       translatedText.textContent = 'Your translation will appear here.';
@@ -157,7 +167,7 @@
     $('metaSource').textContent = sourceLanguage.value
       ? `${sourceName} (selected)`
       : `${sourceName} · auto${Number.isFinite(confidence) ? ` ${Math.round(confidence * 100)}%` : ''}`;
-    $('metaTokens').textContent = data.input_token_count ?? '—';
+    $('metaTokens').textContent = Number(data.input_character_count || 0).toLocaleString();
     $('metaLatency').textContent = Number.isFinite(Number(data.latency_ms)) ? `${Number(data.latency_ms).toLocaleString(undefined, { maximumFractionDigits: 0 })} ms` : '—';
     $('metaProtection').textContent = protectTerms.checked ? 'Enabled' : 'Disabled';
     resultMeta.hidden = false;
@@ -178,7 +188,7 @@
     $('metaSource').textContent = sourceLanguage.value
       ? `${languageNames[sourceLanguage.value]} (selected)`
       : 'Auto-detected per message';
-    $('metaTokens').textContent = results.reduce((sum, item) => sum + (Number(item.input_token_count) || 0), 0).toLocaleString();
+    $('metaTokens').textContent = results.reduce((sum, item) => sum + (Number(item.input_character_count) || 0), 0).toLocaleString();
     const totalMs = results.reduce((sum, item) => sum + (Number(item.latency_ms) || 0), 0);
     $('metaLatency').textContent = `${Math.round(totalMs).toLocaleString()} ms total`;
     $('metaProtection').textContent = protectTerms.checked ? 'Enabled' : 'Disabled';

@@ -19,7 +19,8 @@
         <span class="brand-copy"><strong>Multilingual</strong><span>Translation System</span></span>
       </a>
       <div class="topbar-right">
-        <span class="model-pill"><span class="live-dot"></span> NLLB-600M</span>
+        <!-- Translation provider: migrated from locally hosted NLLB to Google Cloud. -->
+        <span class="model-pill"><span class="live-dot"></span> Google Cloud Translation</span>
         <div class="social-links">
           <a
               href="https://github.com/a-dinesh-kumar"
@@ -91,7 +92,7 @@
 
         <div class="result-meta" id="resultMeta" hidden>
           <div class="meta-item"><span class="meta-icon">◉</span><div><small>Source language</small><strong id="metaSource">—</strong></div></div>
-          <div class="meta-item"><span class="meta-icon">⌁</span><div><small>Input tokens</small><strong id="metaTokens">—</strong></div></div>
+          <div class="meta-item"><span class="meta-icon">⌁</span><div><small>Input characters</small><strong id="metaTokens">—</strong></div></div>
           <div class="meta-item"><span class="meta-icon">◷</span><div><small>Translation time</small><strong id="metaLatency">—</strong></div></div>
           <div class="meta-item"><span class="meta-icon">✓</span><div><small>Term protection</small><strong id="metaProtection">—</strong></div></div>
         </div>
@@ -99,7 +100,7 @@
       </section>
 
       <section class="bottom-info">
-        <div class="info-card"><span class="info-icon blue-icon">⌘</span><div><h3>Context-aware translation</h3><p>Powered by Meta's NLLB multilingual model.</p></div></div>
+        <div class="info-card"><span class="info-icon blue-icon">⌘</span><div><h3>Context-aware translation</h3><p>Powered by Google Cloud Translation API.</p></div></div>
         <div class="info-card"><span class="info-icon violet-icon">♧</span><div><h3>Support-friendly</h3><p>Designed for everyday customer messages.</p></div></div>
         <div class="info-card"><span class="info-icon green-icon">⌁</span><div><h3>Details protected</h3><p>Optionally preserve IDs, URLs and emails.</p></div></div>
       </section>

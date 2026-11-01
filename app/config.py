@@ -6,6 +6,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "Multilingual Customer-Support Translation System"
     app_version: str = "1.0.0"
+
+    # Legacy NLLB configuration.
+    # Retained temporarily during the migration.
     model_name: str = "facebook/nllb-200-distilled-600M"
     max_input_tokens: int = 128
     max_new_tokens: int = 128
@@ -13,8 +16,17 @@ class Settings(BaseSettings):
     no_repeat_ngram_size: int = 3
     length_penalty: float = 1.0
     early_stopping: bool = True
+
+    # Application configuration
     default_source_language: str = "en"
     log_level: str = "INFO"
+
+    # Google Cloud Translation API configuration
+    google_translate_api_key: str | None = None
+    
+    google_translate_api_url: str = (
+        "https://translation.googleapis.com/language/translate/v2"
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -25,11 +37,11 @@ class Settings(BaseSettings):
 
 
 LANGUAGES = {
-    "en": {"name": "English", "nllb": "eng_Latn"},
-    "fr": {"name": "French", "nllb": "fra_Latn"},
-    "es": {"name": "Spanish", "nllb": "spa_Latn"},
-    "hi": {"name": "Hindi", "nllb": "hin_Deva"},
-    "ta": {"name": "Tamil", "nllb": "tam_Taml"},
+    "en": {"name": "English", "google": "en", "nllb": "eng_Latn"},
+    "fr": {"name": "French", "google": "fr", "nllb": "fra_Latn"},
+    "es": {"name": "Spanish", "google": "es", "nllb": "spa_Latn"},
+    "hi": {"name": "Hindi", "google": "hi", "nllb": "hin_Deva"},
+    "ta": {"name": "Tamil", "google": "ta", "nllb": "tam_Taml"},
 }
 
 

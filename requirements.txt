@@ -7,3 +7,4 @@ sentencepiece==0.2.2
 sacremoses==0.2.0
 langdetect==1.0.9
 pydantic-settings==2.14.1
+requests==2.32.5
